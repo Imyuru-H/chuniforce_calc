@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+
+# 114514
+rinnet_test.py
+.env
