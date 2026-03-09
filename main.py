@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 dotenv.load_dotenv()
 TOKEN = os.getenv("TOKEN")
 FRIENDCODE = os.getenv("FRIENDCODE")
+MAX_RETRIES = int(os.getenv("MAX_RETRIES"))
 
 # Define url bases
 LXNS_URL_BASE = "https://maimai.lxns.net/"
@@ -46,8 +47,29 @@ class ScoreSet(dict):
         return mas_ult_subset
 
 
+class ForceSet(list):
+    """
+    structure = {
+        "name" : data["song_name"],
+        "level_index" : data["level_index"],
+        "constant" : data["difficulty"],
+        "score" : data["score"],
+        "clear_status" : data["if_cleared"],
+        "fc_status" : data["if_fc"],
+        "rank" : data["rank"],
+        "force" : force
+    }
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(self, *args, **kwargs)
+    
+    def sort_by_force(self, reverse:bool=False) -> ForceSet:
+        self.sort(key=lambda x:x["force"], reverse=reverse)
+        return self
+
+
 class AsyncRequester:
-    def __init__(self, token: str, friend_code: int, session: aiohttp.ClientSession):
+    def __init__(self, token:str, friend_code:int, session:aiohttp.ClientSession):
         self.headers = {"Authorization": token}
         self.friend_code = friend_code
         self.session = session
@@ -76,7 +98,7 @@ class AsyncRequester:
             data = await response.json()
             return data["data"]
     
-    async def get_song_difficulty(self, id: int) -> Optional[dict]:
+    async def get_song_difficulty(self, id:int) -> Optional[dict]:
         """
         Get difficulty list from Lxns by song id.
         """
@@ -94,12 +116,12 @@ class AsyncRequester:
 
 
 class AsyncRequestParser:
-    def __init__(self, requester: AsyncRequester):
+    def __init__(self, requester:AsyncRequester):
         self.requester = requester
         self.difficulty_cache = {}  # Add cache to avoid repeated requests
         self.song_name_cache = {}   # Cache song title
     
-    async def parse_best(self, best_data: list) -> ScoreSet:
+    async def parse_best(self, best_data:list) -> ScoreSet:
         best_set = ScoreSet()
         tasks = []
         
@@ -116,12 +138,13 @@ class AsyncRequestParser:
         
         return best_set
     
-    async def parse_new(self, new_data: list) -> ScoreSet:
+    async def parse_new(self, new_data:list) -> ScoreSet:
         new_set = ScoreSet()
         tasks = []
         
         for i, item in enumerate(new_data):
-            tasks.append(self._parse_song_item(i, item, is_best=True))
+            task = self._parse_song_item(i, item, is_best=True)
+            tasks.append(task)
         
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
@@ -133,7 +156,7 @@ class AsyncRequestParser:
         
         return new_set
 
-    async def _parse_song_item(self, index: int, item: dict, is_best: bool = True) -> Tuple[int, dict]:
+    async def _parse_song_item(self, index:int, item:dict, is_best:bool = True) -> Tuple[int, dict]:
         song_id = item["id"]
         level_index = item["level_index"]
         
@@ -157,7 +180,7 @@ class AsyncRequestParser:
         
         return index + 1, result
 
-    async def _get_difficulty_with_retry(self, song_id: int, level_index: int, max_retries: int = 3) -> float:
+    async def _get_difficulty_with_retry(self, song_id:int, level_index:int, max_retries:int=MAX_RETRIES) -> float:
         """Get difficulty data, with retry function."""
         cache_key = (song_id, level_index)
         
@@ -197,7 +220,7 @@ class AsyncRequestParser:
         logger.error(f"Failed to get difficulty for song {song_id} after {max_retries} attempts")
         return 0.0
 
-    def parse_all(self, all_data: list) -> ScoreSet:
+    def parse_all(self, all_data:list) -> ScoreSet:
         all_set = ScoreSet()
         for i, item in enumerate(all_data):
             all_set[i+1] = {
@@ -221,7 +244,7 @@ class AsyncRequestParser:
             logger.warning(f"Unknown FC status: {full_combo}, defaulting to 0")
             return 0
     
-    def _parse_rank(self, rank: str) -> int:
+    def _parse_rank(self, rank:str) -> int:
         rank_map = {
             'd': 0, 'c': 0, 'b': 0, 'bb': 0, 'bbb': 0,
             'a': 1, 'aa': 2, 'aaa': 3,
@@ -234,7 +257,7 @@ class AsyncRequestParser:
 
 
 class AsyncChunithmForceCalculator:
-    def __init__(self, token: str, friend_code: int):
+    def __init__(self, token:str, friend_code:int):
         self.token = token
         self.friend_code = friend_code
         self.session: Optional[aiohttp.ClientSession] = None
@@ -251,20 +274,20 @@ class AsyncChunithmForceCalculator:
         if self.session:
             await self.session.close()
 
-    async def _get_best_set(self, best_data: list) -> ScoreSet:
+    async def _get_best_set(self, best_data:list) -> ScoreSet:
         return await self.parser.parse_best(best_data)
     
-    async def _get_new_set(self, new_data: list) -> ScoreSet:
+    async def _get_new_set(self, new_data:list) -> ScoreSet:
         return await self.parser.parse_new(new_data)
     
-    def _get_ajc_set(self, all_set: ScoreSet) -> ScoreSet:
+    def _get_ajc_set(self, all_set:ScoreSet) -> ScoreSet:
         return all_set.get_ajc_subset()
     
-    def _get_mas_ult_ajc_set(self, all_set: ScoreSet) -> ScoreSet:
+    def _get_mas_ult_ajc_set(self, all_set:ScoreSet) -> ScoreSet:
         return all_set.get_ajc_subset().get_mas_ult_subset()
 
-    def _calculate_force_component(self, score_dict: dict) -> float:
-        def calculate_score_correction(score: int) -> float:
+    def _calculate_force_component(self, score_dict:dict) -> float:
+        def calculate_score_correction(score:int) -> float:
             if score == 1010000:
                 return 2.25
             elif score >= 1009000:
@@ -288,7 +311,7 @@ class AsyncChunithmForceCalculator:
             else:
                 return -5.0
         
-        def calculate_fc_aj_correction(if_fc: int, cleared: bool) -> float:
+        def calculate_fc_aj_correction(if_fc:int, cleared:bool) -> float:
             if cleared:
                 fc_map = {0: 1.5, 1: 2.0, 2: 3.0, 3: 3.1}
                 return fc_map.get(if_fc, 0.0)
@@ -310,7 +333,7 @@ class AsyncChunithmForceCalculator:
 
         return total
 
-    async def _calculate_average_force(self, best_set: ScoreSet, new_set: ScoreSet) -> float:
+    async def _calculate_average_force(self, best_set:ScoreSet, new_set:ScoreSet) -> float:
         # Collect all scores need to calculate
         all_items = []
         all_items.extend([(b, best_set[b]) for b in best_set])
@@ -332,12 +355,12 @@ class AsyncChunithmForceCalculator:
         total = sum(valid_results)
         return total / 50
     
-    async def _calculate_force_component_async(self, score_dict: dict) -> float:
+    async def _calculate_force_component_async(self, score_dict:dict) -> float:
         # Calculate ChuniForce asynchronously
         return self._calculate_force_component(score_dict)
     
-    async def _calculate_ajc_avg_force(self, ajc_set: ScoreSet) -> float:
-        async def calculate_single_ajc_force(score_dict: dict) -> float:
+    async def _calculate_ajc_avg_force(self, ajc_set:ScoreSet) -> float:
+        async def calculate_single_ajc_force(score_dict:dict) -> float:
             song_id = score_dict["id"]
             level_index = score_dict["level_index"]
             
@@ -367,7 +390,7 @@ class AsyncChunithmForceCalculator:
             
         return sum(valid_results) / 50
 
-    def _calculate_mas_ult_ajc_bonus(self, mas_ult_ajc_set: ScoreSet) -> float:
+    def _calculate_mas_ult_ajc_bonus(self, mas_ult_ajc_set:ScoreSet) -> float:
         ajc_count = len(mas_ult_ajc_set)
         return ajc_count / 10000
 
@@ -437,15 +460,121 @@ class AsyncChunithmForceCalculator:
         except Exception as e:
             logger.error(f"Error calculating ChuniForce: {e}")
             return None, time.time() - start_time
+    
+    async def get_all_force_components(self) -> Tuple[Optional[list], Optional[tuple[float, float]], float]:
+        async def parse_score_set(set:ScoreSet) -> ForceSet:
+            def build_forceset_term(data:dict, force:float) -> dict:
+                structure = {
+                    "name" : data["song_name"],
+                    "level_index" : data["level_index"],
+                    "constant" : data["difficulty"],
+                    "score" : data["score"],
+                    "clear_status" : data["if_cleared"],
+                    "fc_status" : data["if_fc"],
+                    "rank" : data["rank"],
+                    "force" : force
+                }
+                
+                return structure
+                
+            result = ForceSet()
+            # Collect all scores need to calculate
+            all_items = []
+            all_items.extend([set[s] for s in set])
+                
+            if not all_items:
+                return 0.0
+                
+            # Calculate all ChuniForce component in parallel
+            tasks = [self._calculate_force_component_async(item) for item in all_items]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+            # Filter out invalid results
+            valid_results = [r for r in results if not isinstance(r, Exception)]
+                
+            if not valid_results:
+                return 0.0
+            
+            for i in range(len(valid_results)):
+                valid_results[i] = round(valid_results[i], 4)
+                
+            if len(all_items) == len(valid_results):
+                for i in range(len(all_items)):
+                    result.append(build_forceset_term(all_items[i], valid_results[i]))
+            
+            return result
+        
+        start_time = time.time()
+        try:
+            # Get all necessary data in parallel
+            logger.info("Fetching user data...")
+            b50_data, scores_data = await asyncio.gather(
+                self.requester.get_user_b50(),
+                self.requester.get_user_scores(),
+                return_exceptions=True
+            )
+            
+            # Check if exception exists
+            if isinstance(b50_data, Exception):
+                raise Exception(f"Failed to get B50 data: {b50_data}")
+            if isinstance(scores_data, Exception):
+                raise Exception(f"Failed to get scores data: {scores_data}")
+            
+            logger.info("Parsing best and new sets...")
+            # Parse data
+            best_set_task = self._get_best_set(b50_data.get("bests", []))
+            new_set_task = self._get_new_set(b50_data.get("new_bests", []))
+            
+            best_set, new_set = await asyncio.gather(best_set_task, new_set_task)
+            
+            b50_set = ScoreSet()
+            for k in best_set:
+                b50_set[len(b50_set)] = best_set[k]
+            for k in new_set:
+                b50_set[len(b50_set)] = new_set[k]
+            
+            logger.info(f"Best set size: {len(best_set)}, New best set size: {len(new_set)}, B50 set size: {len(b50_set)}")
+            
+            # Parse player score
+            all_set = self.parser.parse_all(scores_data)
+            ajc_set = self._get_ajc_set(all_set)
+            mas_ult_ajc_set = self._get_mas_ult_ajc_set(all_set)
+            
+            ajc_b50_force = await self._calculate_ajc_avg_force(ajc_set)
+            mas_ult_ajc_bonus = self._calculate_mas_ult_ajc_bonus(mas_ult_ajc_set)
+            
+            logger.info(f"Total AJC count: {len(ajc_set)}, MAS & ULT AJC count: {len(mas_ult_ajc_set)}")
+            
+            force_set = await parse_score_set(b50_set)
+            sorted_force_set = force_set.sort_by_force(reverse=True)
+            
+            return sorted_force_set, (ajc_b50_force, mas_ult_ajc_bonus), time.time() - start_time
+        except Exception as e:
+            raise e
+            logger.error(f"Error calculating ChuniForce: {e}")
+            return None, None, time.time() - start_time
 
 
-async def lx_chuniforce(token: str, friendcode: int):
+async def lx_chuniforce_total(token:str, friendcode:int):
     async with AsyncChunithmForceCalculator(token, friendcode) as calculator:
         chuniforce, elapsed_time = await calculator.calculate_chuniforce()
-        print(f"\nChuniForce: {chuniforce:.4f}")
+        try:
+            print(f"\nChuniForce: {chuniforce:.4f}")
+        except TypeError:
+            logger.error("ChuniForce can't be NoneType")
         print(f"Calculation Time: {elapsed_time:.3f} seconds")
         
         return chuniforce, elapsed_time
+
+async def lx_chuniforce(token:str, friendcode:int):
+    async with AsyncChunithmForceCalculator(token, friendcode) as calculator:
+        force_set, bonus_force, elapsed_time = await calculator.get_all_force_components()
+        try:
+            for i in force_set:
+                print(i)
+        except TypeError:
+            print("ForceSet can't be NoneType")
+        print(bonus_force, "\n", elapsed_time)
 
 
 if __name__ == "__main__":
