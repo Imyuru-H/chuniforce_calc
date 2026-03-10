@@ -11,4 +11,6 @@ wheels/
 
 # 114514
 rinnet_test.py
+test.py
+main copy.py
 .env
