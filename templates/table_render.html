@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>CHUNIFORCE Calculator</title>
+		<link rel="stylesheet" href="{{ url_for('static', filename='css/table_render.css') }}">
+	</head>
+	<body>
+		<div id="header">
+			<div id="header-content">
+				<b id="chuni">CHUNI</b><b id="force">FORCE</b><span id="explain">Best 50 对象歌曲</span>
+				<br/>
+				<span id="note">By CHUNIFORCE Calculator CH ver.</span>
+				<span id="gen-time">Generated at {{ time }}</span>
+			</div>
+		</div>
+		<div id="content">
+			<div id="top">
+				<div id="player-info">
+					<b id="player-title">PLAYER'S NAME</b>
+					<br/>
+					<span id="player-name">{{ player["name"] }}</span>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>
