@@ -22,6 +22,28 @@
 					<span id="player-name">{{ player["name"] }}</span>
 				</div>
 			</div>
+			<div id="mid">
+				<div id="left">
+					<div id="best-title">
+						<span id="text">Best 50 图表</span>
+					</div>
+					<table id="b50-table">
+						{% for i in range(10) %}
+						<tr>
+							{% for j in range(5) %}
+							<td id="song-block" style="background-image: url(https://cdn.jsdelivr.net/gh/mitian233/chunicover@cached/covers/{{ b50_lst[5*(i)+j]['id'] }}.jpg);">
+								<div id="best-id">#{{ 5*(i)+j }}</div>
+								<div id="const">{{ b50_lst[5*(i)+j]['const'] }}</div>
+							</td>
+							{% endfor %}
+						</tr>
+						{% endfor %}
+					</table>
+				</div>
+				<div id="right">
+					<div id="best-title">AJC Best 50 图表</div>
+				</div>
+			</div>
 		</div>
 	</body>
 </html>

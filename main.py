@@ -5,6 +5,8 @@ import time
 from datetime import datetime
 import os
 import string
+import json
+import unicodedata
 import pickle
 import requests
 import urllib.parse
@@ -201,8 +203,11 @@ def callback():
     }
 
     # 调用 API
-    player = requests.get(PLAYER_API_URL, headers=headers).json()
+    player:dict = requests.get(PLAYER_API_URL, headers=headers).json()
     unparsed_scores = requests.get(f"{LX_BASE_URL}/api/v0/user/chunithm/player/scores", headers=headers).json()
+    
+    # 处理全角字符
+    player["data"]["name"] = unicodedata.normalize("NFKC", player["data"].get("name"))
     
     # 数据处理
     scores = asyncio.run(parse_user_response(unparsed_scores))
@@ -229,10 +234,13 @@ def callback():
 
 @app.route("/table_gen")
 def table_gen():
-    # 获取存储在session中的信息并将其清除以释放内存
-    token = request.args.get('token')
-    packed_data = session[f"table_data_{token}"]
-    del session[f"table_data_{token}"], token
+    try:
+        # 获取存储在session中的信息并将其清除以释放内存
+        token = request.args.get('token')
+        packed_data = session[f"table_data_{token}"]
+        del session[f"table_data_{token}"], token
+    except Exception as e:
+        logger.error(e)
     
     # 解包信息
     player = packed_data[0]
@@ -240,40 +248,26 @@ def table_gen():
     ajc_lst = packed_data[2]
     ajc_cnt = packed_data[3]
     
+    with open("data.json", "w", encoding="utf-8") as file:
+        json.dump(packed_data, file, ensure_ascii=False, indent=4)
+    
     return flask.jsonify(packed_data)
 
 @app.route("/test")
 def test():
-    player = {
-        "character": {
-            "id": 20440,
-            "level": 10,
-            "name": "ヴァルマシアゴースト"
-        },
-        "class_emblem": {
-            "base": 0,
-            "medal": 4
-        },
-        "currency": 701500,
-        "friend_code": 101762085662533,
-        "level": 63,
-        "name": "†Ｉｍｙｕｒｕ†",
-        "over_power": 26553.47,
-        "over_power_progress": 24.57,
-        "rating": 16.52,
-        "rating_possession": "normal",
-        "reborn_count": 0,
-        "total_currency": 780000,
-        "total_play_count": 426,
-        "trophy": {
-            "color": "platina",
-            "id": 7097,
-            "name": "君が笑う再会の夜空へ。"
-        },
-        "upload_time": "2026-03-06T15:11:02Z"
-    }
+    with open("data.json", "r", encoding="utf-8") as file:
+        packed_data = json.load(file)
+    player = packed_data[0]
+    b50_lst = packed_data[1]
+    ajc_lst = packed_data[2]
+    ajc_cnt = packed_data[3]
     
-    return render_template("table_render.html", time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"), player=player)
+    return render_template("table_render.html",
+                           time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                           player=player,
+                           b50_lst=b50_lst,
+                           ajc_lst=ajc_lst,
+                           ajc_cnt=ajc_cnt)
 
 
 if __name__ == "__main__":
