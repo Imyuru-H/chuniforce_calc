@@ -6,6 +6,38 @@
 		<link rel="stylesheet" href="{{ url_for('static', filename='css/table_render.css') }}">
 	</head>
 	<body>
+		<script>
+		    function replaceLevelIndex() {
+		        const elements = document.querySelectorAll('#level-index:not([data-protected])');
+		        
+		        console.log("[LevelIndex] 这次找到要处理的元素数量：", elements.length);
+		
+		        elements.forEach(el => {
+		            if (el.dataset.protected === 'true') {
+		                console.log("[LevelIndex] 跳过已保护的元素");
+		                return;
+		            }
+		
+		            const val = (el.textContent || '').trim();
+		            const map = { '0':'BAS', '1':'ADV', '2':'EXP', '3':'MAS', '4':'ULT' };
+		            const name = map[val] || '???';
+		
+		            console.log("[LevelIndex] 处理值：", val, "→", name);
+		
+		            el.innerHTML = `<div id="${name}">${name}</div>`;
+		            el.style.display = 'block';
+		            
+		            // 打上保护标记，防止被后续代码再次修改
+		            el.dataset.protected = 'true';
+		        });
+		    }
+		
+		    // 多重保险，但都加保护
+		    document.addEventListener('DOMContentLoaded', replaceLevelIndex);
+		    window.addEventListener('load', replaceLevelIndex);
+		    setTimeout(replaceLevelIndex, 300);
+		    setTimeout(replaceLevelIndex, 1200);  // 兜底用
+		</script>
 		<div id="header">
 			<div id="header-content">
 				<b id="chuni">CHUNI</b><b id="force">FORCE</b><span id="explain">Best 50 对象歌曲</span>
@@ -32,8 +64,9 @@
 						<tr>
 							{% for j in range(5) %}
 							<td id="song-block" style="background-image: url(https://cdn.jsdelivr.net/gh/mitian233/chunicover@cached/covers/{{ b50_lst[5*(i)+j]['id'] }}.jpg);">
-								<div id="best-id">#{{ 5*(i)+j }}</div>
-								<div id="const">{{ b50_lst[5*(i)+j]['const'] }}</div>
+								<div id="best-id">#{{ 5*i+j+1 }}</div>
+								<div id="const">{{ b50_lst[5*i+j]['const'] }}</div>
+								<div id="level-index" style="display: none;">{{ b50_lst[5*i+j]['level_index'] }}</div>
 							</td>
 							{% endfor %}
 						</tr>

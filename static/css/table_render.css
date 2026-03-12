@@ -145,6 +145,7 @@ body {
 	background-size: cover;
 	border-radius: 5px;
 	overflow: hidden;
+	position: relative;
 }
 
 #best-id {
@@ -165,11 +166,46 @@ body {
 	color: white;
 	background-color: #000000C0;
 	border-radius: 3px;
-	font-size: 0.375em;
+	font-size: 10px;
 	font-family: var(--font-en);
 	font-weight: 400;
 	padding: 1px 4px;
 	width: fit-content;
 	display: inline-block;
 	float: right;
+}
+
+#level-index {
+	margin: 0 0 3px 3px;
+	position: absolute;
+	bottom: 0px;
+	left: 0px;
+	font-family: var(--font-en);
+	font-size: 0.5em;
+}
+
+#level-index div {
+	padding: 1px 4px;
+	border-radius: 5px;
+	color: white;
+}
+
+#BAS {
+	background-color: #1db96a;
+}
+
+#ADV {
+	background-color: #e09000;
+}
+
+#EXP {
+	background-color: #d83850;
+}
+
+#MAS {
+	background-color: #8b3fcf;
+}
+
+#ULT {
+	background-color: #1a0a0a;
 }
