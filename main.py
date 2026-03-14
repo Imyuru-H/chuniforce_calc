@@ -4,6 +4,7 @@ from math import floor
 import time
 from datetime import datetime
 import os
+import ast
 import string
 import json
 import unicodedata
@@ -47,6 +48,17 @@ PLAYER_API_URL = "https://maimai.lxns.net/api/v0/user/chunithm/player"
 
 # 其它常量
 CHARSET = string.ascii_letters + string.digits
+EMPTY_SCORE = {
+    "clear_status": False,
+    "const": 0.0,
+    "fc_status": "",
+    "force": 0.0,
+    "ajc_force": 0.0,
+    "id": 0,
+    "level_index": 5,
+    "score": "0000000",
+    "title": "暂无数据"
+}
 
 
 # 生成 code_verifier 和 code_challenge
@@ -125,6 +137,7 @@ async def calc_force(data:list) -> list:
     result_list = []
     for i in data:
         i["force"] = round(next((item.get((i["id"], i["level_index"])) for item in force_list if (i["id"], i["level_index"]) in item), None), 4)
+        i["ajc_force"] = round(((i["const"] / 15) ** 2 * 2) if i["fc_status"] == "ajc" else 0.0)
         result_list.append(i)
     
     return result_list
@@ -135,7 +148,7 @@ async def parse_user_response(response:dict) -> list:
     fc_status_mapping = {"alljusticecritical" : "ajc",
                          "alljustice" : "aj",
                          "fullcombo" : "fc",
-                         None : None}
+                         None : ""}
     
     async with AsyncRequester() as requester:
         # 并发获取所有 const 值
@@ -255,19 +268,91 @@ def table_gen():
 
 @app.route("/test")
 def test():
+    def build_chuniforce_html(force:float):
+        def get_class_info(force: float) -> list[int]:
+            if force < 2.5:
+                return [1, 1]
+            
+            # 从 2.5 开始算偏移
+            adjusted = force - 2.5
+            steps = adjusted / 0.5                  # 大部分是 0.5 步长
+            
+            # 特殊处理 14.0~15.0 区间有 0.25 细分（4→5）
+            if force >= 14.0:
+                extra_steps = max(0, (force - 14.0) / 0.25)
+                steps = 13 + extra_steps            # 14.0 对应 steps ≈ 23
+            
+            index = int(steps)                      # 向下取整
+            
+            grade = index // 4 + 1
+            sub   = index % 4 + 1
+            
+            # 兜底
+            if grade > 10 or (grade == 10 and sub > 4):
+                return [10, 4]
+            
+            return [grade, sub]
+        
+        class_info = get_class_info(force)
+        class_map = {
+            1:  "I",
+            2:  "II",
+            3:  "III",
+            4:  "IV",
+            5:  "V",
+            6:  "VI",
+            7:  "VII",
+            8:  "VIII",
+            9:  "IX",
+            10: "X"
+        }
+        emblem_text = class_map.get(class_info[0])
+        stars = "★" * class_info[1] + "☆" * (4 - class_info[1])
+
+        html = f"""<div id='class-card'>
+            <div id='emblem'><span class='emblem-text c{class_info[0]}'>{emblem_text}</span><span class='emblem-stars'>{stars}</span></div>
+            <div id='force-detail'><span class='chuniforce-text c{class_info[0]}'>CHUNIFORCE</span><span class='chuniforce-number c{class_info[0]}'>{force:.3f}</span></div>
+        </div>"""
+
+        return html
+
     with open("data.json", "r", encoding="utf-8") as file:
         packed_data = json.load(file)
-    player = packed_data[0]
-    b50_lst = packed_data[1]
-    ajc_lst = packed_data[2]
-    ajc_cnt = packed_data[3]
+    player:dict  = packed_data[0]
+    b50_lst:list = packed_data[1]
+    ajc_lst:list = packed_data[2]
+    ajc_cnt:int  = packed_data[3]
+
+    total_force, total_ajc_force = 0, 0
+    for i in b50_lst:
+        total_force += i["force"]
+    avg_force = total_force / 50
+
+    for i in ajc_lst:
+        total_ajc_force += i["ajc_force"]
+    avg_ajc_force = total_ajc_force / 50
+
+    ajc_bonus = ajc_cnt / 10000
+    force_result = avg_force + avg_ajc_force + ajc_bonus
+
+    if len(b50_lst) < 50:
+        for _ in range(50 - len(b50_lst)):
+            b50_lst.append(EMPTY_SCORE)
+
+    if len(ajc_lst) < 50:
+        for _ in range(50 - len(ajc_lst)):
+            ajc_lst.append(EMPTY_SCORE)
     
     return render_template("table_render.html",
                            time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                            player=player,
                            b50_lst=b50_lst,
                            ajc_lst=ajc_lst,
-                           ajc_cnt=ajc_cnt)
+                           emblem=build_chuniforce_html(force_result),
+                           force_result=force_result,
+                           avg_force=avg_force,
+                           avg_ajc_force=avg_ajc_force,
+                           ajc_bonus=ajc_bonus)
 
 
 if __name__ == "__main__":

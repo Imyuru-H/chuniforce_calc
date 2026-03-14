@@ -47,14 +47,17 @@
 			    songBlocks.forEach(block => {
 			        // 在当前 block 内部找 title 和 level-index
 			        const title = block.querySelector('#song-title');
-			        const level  = block.querySelector('#level-index');
+			        const level = block.querySelector('#level-index');
+					const score = block.querySelector('#score-block') 
 			
-			        if (title && level) {
+			        if (title && level && score) {
 			            // 获取 title 的实际渲染高度
 			            const titleHeight = title.offsetHeight;
+						const scoreHeight = score.offsetHeight;
 			
 			            // 设置 level 的 bottom = title 高度 + 想要的间距
-			            level.style.bottom = `${titleHeight + 0}px`;
+			            level.style.bottom = `${titleHeight + scoreHeight + 6}px`;
+						title.style.bottom = `${scoreHeight + 3}px`;
 			        }
 			    });
 			}
@@ -78,9 +81,14 @@
 		<div id="content">
 			<div id="top">
 				<div id="player-info">
-					<b id="player-title">PLAYER'S NAME</b>
-					<br/>
-					<span id="player-name">{{ player["name"] }}</span>
+					<div>
+						<b id="player-title">PLAYER'S NAME</b>
+						<br/>
+						<span id="player-name">{{ player["name"] }}</span>
+					</div>
+					<div id="force-info">
+						{{ emblem | safe }}
+					</div>
 				</div>
 			</div>
 			<div id="mid">
@@ -92,11 +100,22 @@
 						{% for i in range(10) %}
 						<tr>
 							{% for j in range(5) %}
-							<td id="song-block" style="background-image: url(https://cdn.jsdelivr.net/gh/mitian233/chunicover@cached/covers/{{ b50_lst[5*(i)+j]['id'] }}.jpg);">
+							<td id="song-block" style="background-image: linear-gradient(
+																						to top, 
+																						rgba(0,0,0,0.8) 0%,
+																						rgba(0,0,0,0.25) 40%,
+																						rgba(0,0,0,0.05) 70%,
+																						transparent 100%
+																					),
+																		url(https://cdn.jsdelivr.net/gh/mitian233/chunicover@cached/covers/{{ b50_lst[5*i+j]['id'] }}.jpg);">
 								<div id="best-id">#{{ 5*i+j+1 }}</div>
 								<div id="const">{{ b50_lst[5*i+j]['const'] }}</div>
 								<div id="level-index" style="display: none;">{{ b50_lst[5*i+j]['level_index'] }}</div>
-								<div id="song-title">{{ b50_lst[5*i+j]['title'] }}</div>
+								<div id="song-title"><span class="center">{{ b50_lst[5*i+j]['title'] }}</span></div>
+								<div id="score-block">
+									<span class="score">{{ b50_lst[5*i+j]['score'] }} {{ b50_lst[5*i+j]['fc_status'] }}</span>
+									<span class="force">{{ b50_lst[5*i+j]['force'] }}</span>
+								</div>
 							</td>
 							{% endfor %}
 						</tr>
@@ -104,7 +123,34 @@
 					</table>
 				</div>
 				<div id="right">
-					<div id="best-title">AJC Best 50 图表</div>
+					<div id="best-title">
+						<span id="text">AJC Best 50 图表</span>
+					</div>
+					<table id="b50-table">
+						{% for i in range(10) %}
+						<tr>
+							{% for j in range(5) %}
+							<td id="song-block" style="background-image: linear-gradient(
+																						to top, 
+																						rgba(0,0,0,0.8) 0%,
+																						rgba(0,0,0,0.25) 40%,
+																						rgba(0,0,0,0.05) 70%,
+																						transparent 100%
+																					),
+																		url(https://cdn.jsdelivr.net/gh/mitian233/chunicover@cached/covers/{{ ajc_lst[5*i+j]['id'] }}.jpg);">
+								<div id="ajc-id">#{{ 5*i+j+1 }}</div>
+								<div id="const">{{ ajc_lst[5*i+j]['const'] }}</div>
+								<div id="level-index" style="display: none;">{{ ajc_lst[5*i+j]['level_index'] }}</div>
+								<div id="song-title"><span class="center">{{ ajc_lst[5*i+j]['title'] }}</span></div>
+								<div id="score-block">
+									<span class="score">{{ ajc_lst[5*i+j]['score'] }} {{ ajc_lst[5*i+j]['fc_status'] }}</span>
+									<span class="ajcforce">{{ ajc_lst[5*i+j]['ajc_force'] }}</span>
+								</div>
+							</td>
+							{% endfor %}
+						</tr>
+						{% endfor %}
+					</table>
 				</div>
 			</div>
 		</div>
