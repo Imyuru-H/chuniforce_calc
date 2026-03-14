@@ -30,6 +30,7 @@
 		            // 打上保护标记，防止被后续代码再次修改
 		            el.dataset.protected = 'true';
 		        });
+				updateLevelPosition()
 		    }
 		
 		    // 多重保险，但都加保护
@@ -37,6 +38,34 @@
 		    window.addEventListener('load', replaceLevelIndex);
 		    setTimeout(replaceLevelIndex, 300);
 		    setTimeout(replaceLevelIndex, 1200);  // 兜底用
+		</script>
+		<script>
+			function updateAllLevelPositions() {
+			    // 找到所有 song-block
+			    const songBlocks = document.querySelectorAll('#song-block');
+			
+			    songBlocks.forEach(block => {
+			        // 在当前 block 内部找 title 和 level-index
+			        const title = block.querySelector('#song-title');
+			        const level  = block.querySelector('#level-index');
+			
+			        if (title && level) {
+			            // 获取 title 的实际渲染高度
+			            const titleHeight = title.offsetHeight;
+			
+			            // 设置 level 的 bottom = title 高度 + 想要的间距
+			            level.style.bottom = `${titleHeight + 0}px`;
+			        }
+			    });
+			}
+			
+			document.addEventListener('DOMContentLoaded', updateAllLevelPositions);
+			
+			let resizeTimer;
+			window.addEventListener('resize', () => {
+			    clearTimeout(resizeTimer);
+			    resizeTimer = setTimeout(updateAllLevelPositions, 100);
+			});
 		</script>
 		<div id="header">
 			<div id="header-content">
@@ -67,6 +96,7 @@
 								<div id="best-id">#{{ 5*i+j+1 }}</div>
 								<div id="const">{{ b50_lst[5*i+j]['const'] }}</div>
 								<div id="level-index" style="display: none;">{{ b50_lst[5*i+j]['level_index'] }}</div>
+								<div id="song-title">{{ b50_lst[5*i+j]['title'] }}</div>
 							</td>
 							{% endfor %}
 						</tr>

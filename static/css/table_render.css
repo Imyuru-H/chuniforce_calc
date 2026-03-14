@@ -178,7 +178,6 @@ body {
 #level-index {
 	margin: 0 0 3px 3px;
 	position: absolute;
-	bottom: 0px;
 	left: 0px;
 	font-family: var(--font-en);
 	font-size: 0.5em;
@@ -187,25 +186,37 @@ body {
 #level-index div {
 	padding: 1px 4px;
 	border-radius: 5px;
-	color: white;
+	color: #ffffffbb;
 }
 
 #BAS {
-	background-color: #1db96a;
+	background-color: #1db96abb;
 }
 
 #ADV {
-	background-color: #e09000;
+	background-color: #e09000bb;
 }
 
 #EXP {
-	background-color: #d83850;
+	background-color: #d83850bb;
 }
 
 #MAS {
-	background-color: #8b3fcf;
+	background-color: #8b3fcfbb;
 }
 
 #ULT {
-	background-color: #1a0a0a;
+	background-color: #1a0a0abb;
+}
+
+#song-title {
+	margin: 3px;
+	position: absolute;
+	bottom: 0px;
+	text-align: center !important;
+	justify-content: center;
+	align-items: center;
+	color: white;
+	font-family: var(--font-en);
+	font-size: 0.25em;
 }
