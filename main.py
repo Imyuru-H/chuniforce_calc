@@ -38,7 +38,7 @@ CONST_DICT = {item["id"]:item["ds"] for item in data}
 
 # 应用信息（公共客户端，无 secret）
 CLIENT_ID = "b6247554-a2e8-4461-b04b-743b08e44073"
-REDIRECT_URI = "http://localhost:5000/callback"
+REDIRECT_URI = "cn-hk-bgp-4.ofalias.net:35023/callback"
 
 # OAuth 接口地址
 AUTHORIZE_URL = "https://maimai.lxns.net/oauth/authorize"
@@ -247,6 +247,54 @@ def callback():
 
 @app.route("/table_gen")
 def table_gen():
+    def build_chuniforce_html(force:float):
+        def get_class_info(force: float) -> list[int]:
+            if force < 2.5:
+                return [1, 1]
+            
+            # 从 2.5 开始算偏移
+            adjusted = force - 2.5
+            steps = adjusted / 0.5                  # 大部分是 0.5 步长
+            
+            # 特殊处理 14.0~15.0 区间有 0.25 细分（4→5）
+            if force >= 14.0:
+                extra_steps = max(0, (force - 14.0) / 0.25)
+                steps = 13 + extra_steps            # 14.0 对应 steps ≈ 23
+            
+            index = int(steps)                      # 向下取整
+            
+            grade = index // 4 + 1
+            sub   = index % 4 + 1
+            
+            # 兜底
+            if grade > 10 or (grade == 10 and sub > 4):
+                return [10, 4]
+            
+            return [grade, sub]
+        
+        class_info = get_class_info(force)
+        class_map = {
+            1:  "I",
+            2:  "II",
+            3:  "III",
+            4:  "IV",
+            5:  "V",
+            6:  "VI",
+            7:  "VII",
+            8:  "VIII",
+            9:  "IX",
+            10: "X"
+        }
+        emblem_text = class_map.get(class_info[0])
+        stars = "★" * class_info[1] + "☆" * (4 - class_info[1])
+
+        html = f"""<div id='class-card' style="display: inline-block;">
+            <div id='emblem'><span class='emblem-text c{class_info[0]}'>{emblem_text}</span><span class='emblem-stars'>{stars}</span></div>
+            <div id='force-detail'><span class='chuniforce-text c{class_info[0]}'>CHUNIFORCE</span><span class='chuniforce-number c{class_info[0]}'>{force:.3f}</span></div>
+        </div>"""
+
+        return html
+    
     try:
         # 获取存储在session中的信息并将其清除以释放内存
         token = request.args.get('token')
@@ -255,16 +303,42 @@ def table_gen():
     except Exception as e:
         logger.error(e)
     
-    # 解包信息
-    player = packed_data[0]
-    b50_lst = packed_data[1]
-    ajc_lst = packed_data[2]
-    ajc_cnt = packed_data[3]
+    # 解包信息    
+    player:dict  = packed_data[0]
+    b50_lst:list = packed_data[1]
+    ajc_lst:list = packed_data[2]
+    ajc_cnt:int  = packed_data[3]
+
+    total_force, total_ajc_force = 0, 0
+    for i in b50_lst:
+        total_force += i["force"]
+    avg_force = total_force / 50
+
+    for i in ajc_lst:
+        total_ajc_force += i["ajc_force"]
+    avg_ajc_force = total_ajc_force / 50
+
+    ajc_bonus = ajc_cnt / 10000
+    force_result = avg_force + avg_ajc_force + ajc_bonus
+
+    if len(b50_lst) < 50:
+        for _ in range(50 - len(b50_lst)):
+            b50_lst.append(EMPTY_SCORE)
+
+    if len(ajc_lst) < 50:
+        for _ in range(50 - len(ajc_lst)):
+            ajc_lst.append(EMPTY_SCORE)
     
-    with open("data.json", "w", encoding="utf-8") as file:
-        json.dump(packed_data, file, ensure_ascii=False, indent=4)
-    
-    return flask.jsonify(packed_data)
+    return render_template("table_render.html",
+                           time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                           player=player,
+                           b50_lst=b50_lst,
+                           ajc_lst=ajc_lst,
+                           emblem=build_chuniforce_html(force_result),
+                           force_result=force_result,
+                           avg_force=round(avg_force, 4),
+                           avg_ajc_force=avg_ajc_force,
+                           ajc_bonus=ajc_bonus)
 
 @app.route("/test")
 def test():
@@ -309,7 +383,7 @@ def test():
         emblem_text = class_map.get(class_info[0])
         stars = "★" * class_info[1] + "☆" * (4 - class_info[1])
 
-        html = f"""<div id='class-card'>
+        html = f"""<div id='class-card' style="display: inline-block;">
             <div id='emblem'><span class='emblem-text c{class_info[0]}'>{emblem_text}</span><span class='emblem-stars'>{stars}</span></div>
             <div id='force-detail'><span class='chuniforce-text c{class_info[0]}'>CHUNIFORCE</span><span class='chuniforce-number c{class_info[0]}'>{force:.3f}</span></div>
         </div>"""
@@ -350,10 +424,10 @@ def test():
                            ajc_lst=ajc_lst,
                            emblem=build_chuniforce_html(force_result),
                            force_result=force_result,
-                           avg_force=avg_force,
+                           avg_force=round(avg_force, 4),
                            avg_ajc_force=avg_ajc_force,
                            ajc_bonus=ajc_bonus)
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(host="127.0.0.1", port=443)

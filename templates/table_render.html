@@ -4,72 +4,115 @@
 		<meta charset="utf-8">
 		<title>CHUNIFORCE Calculator</title>
 		<link rel="stylesheet" href="{{ url_for('static', filename='css/table_render.css') }}">
+		<script>
+		// =============================================
+		// 1. 处理 level-index → 显示 BAS/ADV/EXP/MAS/ULT
+		// =============================================
+		function replaceLevelIndex() {
+		    const elements = document.querySelectorAll('#level-index:not([data-protected])');
+		    
+		    console.log("[LevelIndex] 这次找到要处理的元素数量：", elements.length);
+		
+		    elements.forEach(el => {
+		        if (el.dataset.protected === 'true') {
+		            console.log("[LevelIndex] 跳过已保护的元素");
+		            return;
+		        }
+		
+		        const val = (el.textContent || '').trim();
+		        const map = { '0':'BAS', '1':'ADV', '2':'EXP', '3':'MAS', '4':'ULT' };
+		        const name = map[val] || '???';
+		
+		        console.log("[LevelIndex] 处理值：", val, "→", name);
+		
+		        el.innerHTML = `<div id="${name}">${name}</div>`;
+		        el.style.display = 'block';
+		        
+		        // 打上保护标记，防止重复处理
+		        el.dataset.protected = 'true';
+		    });
+		
+		    // 处理完难度标签后再更新一次位置
+		    updateAllLevelPositions();
+		}
+		
+		// =============================================
+		// 2. 动态计算 #level-index 的 bottom 位置
+		//    让它始终在 #song-title 上方，且不被 #score-block 压住
+		// =============================================
+		function updateAllLevelPositions() {
+		    const songBlocks = document.querySelectorAll('#song-block');
+		
+		    songBlocks.forEach(block => {
+		        const title  = block.querySelector('#song-title');
+		        const level  = block.querySelector('#level-index');
+		        const score  = block.querySelector('#score-block');
+		
+		        if (title && level && score) {
+		            const titleHeight = title.offsetHeight;
+		            const scoreHeight = score.offsetHeight;
+		
+		            // level 放在 title 上方，留 6px 间隙
+		            level.style.bottom = `${titleHeight + scoreHeight + 6}px`;
+		            
+		            // title 放在 score-block 上方，留 3px 间隙
+		            title.style.bottom = `${scoreHeight + 3}px`;
+		        }
+		    });
+		}
+		
+		// =============================================
+		// 3. 整体内容缩放（当窗口宽度 < 1600px 时等比缩小 #content）
+		// =============================================
+		function updateContentScaleRatio() {
+		    const html = document.documentElement;
+		    const content = document.querySelector('#content');
+		    if (!content) return;
+		    
+		    const w = html.clientWidth;
+		    let scale = 1;
+		    if (w < 1632) {
+		        scale = w / 1632;
+		    }
+		    
+		    content.style.zoom = scale;
+		}
+		
+		// =============================================
+		// 初始化执行 & 事件绑定
+		// =============================================
+		
+		// 页面加载完成后执行所有初始化
+		function initAll() {
+		    replaceLevelIndex();
+		    updateAllLevelPositions();
+		    updateContentScaleRatio();
+		}
+		
+		// 立即尝试执行（兼容不同加载时机）
+		if (document.readyState === 'loading') {
+		    document.addEventListener('DOMContentLoaded', initAll);
+		} else {
+		    initAll();
+		}
+		
+		// 窗口 resize 时统一处理（防抖 100ms）
+		let globalResizeTimer;
+		window.addEventListener('resize', () => {
+		    clearTimeout(globalResizeTimer);
+		    globalResizeTimer = setTimeout(() => {
+		        updateAllLevelPositions();
+		        updateContentScaleRatio();
+		    }, 20);
+		});
+		
+		// 额外保险：1秒后、2秒后各再执行一次（应对异步渲染、图片加载后高度变化）
+		setTimeout(initAll, 800);
+		setTimeout(initAll, 1800);
+		
+		</script>
 	</head>
 	<body>
-		<script>
-		    function replaceLevelIndex() {
-		        const elements = document.querySelectorAll('#level-index:not([data-protected])');
-		        
-		        console.log("[LevelIndex] 这次找到要处理的元素数量：", elements.length);
-		
-		        elements.forEach(el => {
-		            if (el.dataset.protected === 'true') {
-		                console.log("[LevelIndex] 跳过已保护的元素");
-		                return;
-		            }
-		
-		            const val = (el.textContent || '').trim();
-		            const map = { '0':'BAS', '1':'ADV', '2':'EXP', '3':'MAS', '4':'ULT' };
-		            const name = map[val] || '???';
-		
-		            console.log("[LevelIndex] 处理值：", val, "→", name);
-		
-		            el.innerHTML = `<div id="${name}">${name}</div>`;
-		            el.style.display = 'block';
-		            
-		            // 打上保护标记，防止被后续代码再次修改
-		            el.dataset.protected = 'true';
-		        });
-				updateLevelPosition()
-		    }
-		
-		    // 多重保险，但都加保护
-		    document.addEventListener('DOMContentLoaded', replaceLevelIndex);
-		    window.addEventListener('load', replaceLevelIndex);
-		    setTimeout(replaceLevelIndex, 300);
-		    setTimeout(replaceLevelIndex, 1200);  // 兜底用
-		</script>
-		<script>
-			function updateAllLevelPositions() {
-			    // 找到所有 song-block
-			    const songBlocks = document.querySelectorAll('#song-block');
-			
-			    songBlocks.forEach(block => {
-			        // 在当前 block 内部找 title 和 level-index
-			        const title = block.querySelector('#song-title');
-			        const level = block.querySelector('#level-index');
-					const score = block.querySelector('#score-block') 
-			
-			        if (title && level && score) {
-			            // 获取 title 的实际渲染高度
-			            const titleHeight = title.offsetHeight;
-						const scoreHeight = score.offsetHeight;
-			
-			            // 设置 level 的 bottom = title 高度 + 想要的间距
-			            level.style.bottom = `${titleHeight + scoreHeight + 6}px`;
-						title.style.bottom = `${scoreHeight + 3}px`;
-			        }
-			    });
-			}
-			
-			document.addEventListener('DOMContentLoaded', updateAllLevelPositions);
-			
-			let resizeTimer;
-			window.addEventListener('resize', () => {
-			    clearTimeout(resizeTimer);
-			    resizeTimer = setTimeout(updateAllLevelPositions, 100);
-			});
-		</script>
 		<div id="header">
 			<div id="header-content">
 				<b id="chuni">CHUNI</b><b id="force">FORCE</b><span id="explain">Best 50 对象歌曲</span>
@@ -81,13 +124,31 @@
 		<div id="content">
 			<div id="top">
 				<div id="player-info">
-					<div>
+					<div id="player-card">
 						<b id="player-title">PLAYER'S NAME</b>
 						<br/>
 						<span id="player-name">{{ player["name"] }}</span>
 					</div>
 					<div id="force-info">
 						{{ emblem | safe }}
+						<div id="force-compose" style="display: inline-block;">
+							<table>
+								<tbody>
+									<tr>
+										<td class="force-conponent-term">Best 50</td>
+										<td class="best50">{{ avg_force | default(0.0) }}</td>
+									</tr>
+									<tr>
+										<td class="force-conponent-term">AJC Best 50</td>
+										<td class="ajc-best50">{{ avg_ajc | default(0.0) }}</td>
+									</tr>
+									<tr>
+										<td class="force-conponent-term">理论值总数加成</td>
+										<td class="ajc-bonus">+{{ ajc_bonus }}</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
 					</div>
 				</div>
 			</div>

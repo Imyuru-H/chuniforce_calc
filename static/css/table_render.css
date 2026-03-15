@@ -10,6 +10,9 @@
 	--font-en: "Outfit", sans-serif;
 }
 
+body::-webkit-scrollbar {
+	display: none;
+}
 
 body {
 	margin: 0;
@@ -22,6 +25,7 @@ body {
     width: 100%;
     padding-bottom: 1px;
 	background-color: #0e1120;
+	z-index: 114514;
 }
 
 #header::after {
@@ -72,6 +76,10 @@ body {
 
 #content {
 	padding: 16px;
+	width: 1600px;
+	min-width: 1600px;
+	margin-left: auto;
+	margin-right: auto;
 }
 
 #player-info {
@@ -83,6 +91,11 @@ body {
 	border-radius: 10px;
 	position: relative;
 	display: flex;
+}
+
+#player-card {
+	margin-top: auto;
+	margin-bottom: auto;
 }
 
 #player-title {
@@ -101,10 +114,12 @@ body {
 }
 
 #force-info {
-	margin-left: auto;
-	display: inline-block;
-	margin-top: auto;
-	margin-bottom: auto;
+    display: flex;
+    align-items: flex-end;
+    gap: 1em;
+    margin-left: auto;
+    margin-top: auto;
+    margin-bottom: auto;
 }
 
 @keyframes rainbow {
@@ -155,7 +170,26 @@ body {
 }
 
 #force-compose {
-	
+	margin-top: 10px;
+	font-family: var(--font-en);
+	font-size: 0.875em;
+}
+
+.force-conponent-term {
+	color: #555a74;
+	padding-right: 10px;
+}
+
+.best50, .ajc-best50, .ajc-bonus {
+	padding-right: 10px;
+}
+
+.best50, .ajc-best50 {
+	color: white;
+}
+
+.ajc-bonus {
+	color: #00e5ff;
 }
 
 .c1 { color: #bdc3c7; text-shadow: 0 0 10px rgba(189,195,199,0.7); }
