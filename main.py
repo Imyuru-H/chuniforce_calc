@@ -19,6 +19,8 @@ import aiohttp
 import logging
 import dotenv
 
+from workers import WorkerEntrypoint, Response
+
 
 # Read .env
 dotenv.load_dotenv()
