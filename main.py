@@ -38,7 +38,7 @@ CONST_DICT = {item["id"]:item["ds"] for item in data}
 
 # 应用信息（公共客户端，无 secret）
 CLIENT_ID = "b6247554-a2e8-4461-b04b-743b08e44073"
-REDIRECT_URI = "cn-hk-bgp-4.ofalias.net:35023/callback"
+REDIRECT_URI = "http://localhost:5000/callback"
 
 # OAuth 接口地址
 AUTHORIZE_URL = "https://maimai.lxns.net/oauth/authorize"
@@ -197,6 +197,7 @@ def home():
 @app.route("/callback")
 def callback():
     start_time = time.time()
+    logger.info("Get callback response")
     code = request.args.get("code")
     if not code:
         return "授权失败，未获取到授权码", 400
@@ -430,4 +431,4 @@ def test():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=443)
+    app.run(host="127.0.0.1", port=5000)
