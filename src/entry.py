@@ -13,9 +13,12 @@ import unicodedata
 import logging
 import secrets
 import json
+import time
+import redis.asyncio as aioredis
 from datetime import datetime
 from .calc import parse_user_response, calc_force, EMPTY_SCORE
 from .utils import generate_code_verifier, generate_code_challenge
+from .redisDict import AsyncRedisDict
 
 
 app = FastAPI()
@@ -32,19 +35,32 @@ TOKEN_URL = "https://maimai.lxns.net/api/v0/oauth/token"
 LX_BASE_URL = "https://maimai.lxns.net"
 PLAYER_API_URL = f"{LX_BASE_URL}/api/v0/user/chunithm/player"
 
-temp_data_store: dict[str, tuple[Any, datetime]] = {}
+temp_data_store = AsyncRedisDict(
+    redis_url="redis://localhost:6379",
+    initial_data={},
+    default_ttl=600  # 初始数据30秒后过期
+)
+asyncio.run(temp_data_store.connect())
 
 # 配置 FastAPI APP
 app.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_KEY,
-    session_cookie="session",     # 建议显式指定名字，避免默认值冲突
-    same_site="lax",                 # 开发时建议加，防止浏览器不发 cookie
-    https_only=False,                # 本地开发用 False，线上改 True
-    max_age=3600,           # 可选，设置过期时间
+    session_cookie="session", # 建议显式指定名字，避免默认值冲突
+    same_site="lax",          # 开发时建议加，防止浏览器不发 cookie
+    https_only=False,         # 本地开发用 False，线上改 True
+    max_age=3600,             # 可选，设置过期时间
 )
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+
+class AsyncRedisDict:
+    def __init__(self, ttl: int = 60, redis_url: str = "redis://localhost:6379"):
+        self.ttl = ttl
+        self.redis = None
+        self.redis_url = redis_url
+        self.key_prefix = "my_dict:"
 
 
 def build_chuniforce_html(force: float) -> str:
@@ -144,7 +160,7 @@ async def callback(request: Request, code: str = Query(None), state: str = Query
         ajc_lst.append(EMPTY_SCORE.copy())
 
     token = secrets.token_urlsafe(16)
-    packed_data = [player["data"], b50_lst, ajc_lst, ajc_count]
+    packed_data = [player["data"], b50_lst, ajc_lst, ajc_count, time.time()]
     
     temp_data_store[f"table_data_{token}"] = packed_data
 
