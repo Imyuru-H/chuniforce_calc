@@ -1,8 +1,13 @@
 [project]
-name = "chuni-force"
+name = "chuniforce"
+version = "0.2.0"
+description = "Your project description"
+requires-python = ">=3.14.3"
 dependencies = [
     "fastapi",
     "jinja2",
     "aiohttp",
     "workers-py",
+    "requests",
+    "itsdangerous>=2.2.0",
 ]
