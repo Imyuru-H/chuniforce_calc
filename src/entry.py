@@ -41,7 +41,7 @@ app.add_middleware(
     session_cookie="session",     # 建议显式指定名字，避免默认值冲突
     same_site="lax",                 # 开发时建议加，防止浏览器不发 cookie
     https_only=False,                # 本地开发用 False，线上改 True
-    max_age=3600 * 24 * 7,           # 可选，设置过期时间
+    max_age=3600,           # 可选，设置过期时间
 )
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
