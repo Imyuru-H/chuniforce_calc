@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from contextlib import asynccontextmanager
-# from workers import WorkerEntrypoint
+from workers import WorkerEntrypoint
 import urllib
 import aiohttp
 import asyncio
@@ -273,10 +273,10 @@ async def table_gen(request: Request, token: str = Query(...)):
                                       status_code=200)
 
 
-"""class Default(WorkerEntrypoint):
+class Default(WorkerEntrypoint):
     async def fetch(self, req):
         from asgi import fetch as asgi_fetch  # Cloudflare 提供的 ASGI 桥接
-        return await asgi_fetch(app, req.js_object, self.env)"""
+        return await asgi_fetch(app, req.js_object, self.env)
 
 
 if __name__ == "__main__":
