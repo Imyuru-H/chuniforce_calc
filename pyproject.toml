@@ -11,3 +11,9 @@ dependencies = [
     "requests",
     "itsdangerous>=2.2.0",
 ]
+
+[dependency-groups]
+dev = [
+    "workers-py",
+    "workers-runtime-sdk",
+]

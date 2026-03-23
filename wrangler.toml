@@ -1,4 +1,7 @@
 name = "chuniforce-calc"
 main = "src/entry.py"
-compatibility_date = "2026-03-21"
+compatibility_date = "2026-03-23"
 compatibility_flags = ["python_workers"]
+
+[site]
+bucket = "./static"               # 如果有静态文件
