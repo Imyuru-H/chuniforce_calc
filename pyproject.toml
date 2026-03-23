@@ -10,5 +10,4 @@ dependencies = [
     "workers-py",
     "requests",
     "itsdangerous>=2.2.0",
-    "redis>=7.3.0",
 ]

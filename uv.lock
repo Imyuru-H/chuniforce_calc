@@ -158,6 +158,7 @@ dependencies = [
     { name = "jinja2" },
     { name = "redis" },
     { name = "requests" },
+    { name = "starsessions" },
     { name = "workers-py" },
 ]
 
@@ -169,6 +170,7 @@ requires-dist = [
     { name = "jinja2" },
     { name = "redis", specifier = ">=7.3.0" },
     { name = "requests" },
+    { name = "starsessions", extras = ["all"], specifier = ">=2.2.1" },
     { name = "workers-py" },
 ]
 
@@ -595,6 +597,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c4/68/79977123bb7be889ad680d79a40f339082c1978b5cfcf62c2d8d196873ac/starlette-0.52.1.tar.gz", hash = "sha256:834edd1b0a23167694292e94f597773bc3f89f362be6effee198165a35d62933", size = 2653702, upload-time = "2026-01-18T13:34:11.062Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/0d/13d1d239a25cbfb19e740db83143e95c772a1fe10202dda4b76792b114dd/starlette-0.52.1-py3-none-any.whl", hash = "sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74", size = 74272, upload-time = "2026-01-18T13:34:09.188Z" },
+]
+
+[[package]]
+name = "starsessions"
+version = "2.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "itsdangerous" },
+    { name = "starlette" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/86/a1/dd738cd47b7a1c681cae49c4f7c88cc953b2aca4de455c2aacda6652e7ce/starsessions-2.2.1.tar.gz", hash = "sha256:ce5e4448d9bf2c76222e56cd099ad92d22313e8a4def612e22b71a122cc11da0", size = 15048, upload-time = "2024-10-23T09:01:12.343Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d2/ce/fc699345a3cdfb4425b5dc1e446f1b49702ac55907a6a4d5d806f2512dae/starsessions-2.2.1-py3-none-any.whl", hash = "sha256:8097b33d70017b2d2331307f0ea923620b5bfb847118d2e5872805d0c1c16f83", size = 14621, upload-time = "2024-10-23T09:01:10.88Z" },
 ]
 
 [[package]]

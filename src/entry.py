@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
+from contextlib import asynccontextmanager
 # from workers import WorkerEntrypoint
 import urllib
 import aiohttp
@@ -18,10 +19,22 @@ import redis.asyncio as aioredis
 from datetime import datetime
 from .calc import parse_user_response, calc_force, EMPTY_SCORE
 from .utils import generate_code_verifier, generate_code_challenge
-from .redisDict import AsyncRedisDict
+from .ttl_dict import AsyncTTLDict
 
 
-app = FastAPI()
+temp_data_store = AsyncTTLDict(default_ttl=600)
+
+# lifespan 里加启动清理
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await temp_data_store.start_cleanup()
+    try:
+        yield
+    finally:
+        if temp_data_store._cleanup_task:
+            temp_data_store._cleanup_task.cancel()
+
+app = FastAPI(lifespan=lifespan)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,12 +48,6 @@ TOKEN_URL = "https://maimai.lxns.net/api/v0/oauth/token"
 LX_BASE_URL = "https://maimai.lxns.net"
 PLAYER_API_URL = f"{LX_BASE_URL}/api/v0/user/chunithm/player"
 
-temp_data_store = AsyncRedisDict(
-    redis_url="redis://localhost:6379",
-    initial_data={},
-    default_ttl=600  # 初始数据30秒后过期
-)
-asyncio.run(temp_data_store.connect())
 
 # 配置 FastAPI APP
 app.add_middleware(
@@ -162,7 +169,7 @@ async def callback(request: Request, code: str = Query(None), state: str = Query
     token = secrets.token_urlsafe(16)
     packed_data = [player["data"], b50_lst, ajc_lst, ajc_count, time.time()]
     
-    temp_data_store[f"table_data_{token}"] = packed_data
+    await temp_data_store.set(key=f"table_data_{token}", value=packed_data)
 
     return RedirectResponse(url=f"/table?token={token}")
 
@@ -218,8 +225,7 @@ async def table_gen(request: Request, token: str = Query(...)):
     
     try:
         # 获取存储在session中的信息并将其清除以释放内存
-        packed_data = temp_data_store.get(f"table_data_{token}")
-        del temp_data_store[f"table_data_{token}"], token
+        packed_data = await temp_data_store.get(f"table_data_{token}")
     except Exception as e:
         logger.error(e)
     
@@ -275,4 +281,4 @@ async def table_gen(request: Request, token: str = Query(...)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run(app, host="127.0.0.1", port=5000, reload=True)
