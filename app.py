@@ -6,7 +6,6 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from contextlib import asynccontextmanager
-from workers import WorkerEntrypoint
 import urllib
 import aiohttp
 import asyncio
@@ -15,11 +14,17 @@ import logging
 import secrets
 import json
 import time
+import uuid
 import redis.asyncio as aioredis
 from datetime import datetime
-from .calc import parse_user_response, calc_force, EMPTY_SCORE
-from .utils import generate_code_verifier, generate_code_challenge
-from .ttl_dict import AsyncTTLDict
+
+from src.calc import parse_user_response, calc_force, EMPTY_SCORE
+from src.utils import generate_code_verifier, generate_code_challenge
+from src.ttl_dict import AsyncTTLDict
+from src.database import DatabaseManager
+
+
+__version__ = "0.1.0a"
 
 
 temp_data_store = AsyncTTLDict(default_ttl=600)
@@ -27,6 +32,17 @@ temp_data_store = AsyncTTLDict(default_ttl=600)
 # lifespan 里加启动清理
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 初始化数据库
+    await DatabaseManager.init_db()
+    logger.info("Database initialized")
+    try:
+        yield
+    finally:
+        # 关闭数据库连接
+        from src.database import engine
+        await engine.dispose()
+        logger.info("Database connection closed")
+    
     await temp_data_store.start_cleanup()
     try:
         yield
@@ -166,35 +182,44 @@ async def callback(request: Request, code: str = Query(None), state: str = Query
     while len(ajc_lst) < 50:
         ajc_lst.append(EMPTY_SCORE.copy())
 
-    token = secrets.token_urlsafe(16)
-    packed_data = [player["data"], b50_lst, ajc_lst, ajc_count, time.time()]
+    # 生成 UUID
+    user_uuid = str(uuid.uuid4())
     
-    await temp_data_store.set(key=f"table_data_{token}", value=packed_data)
+    # 使用数据库保存数据
+    success = await DatabaseManager.save_user_data(
+        uuid=user_uuid,
+        player_data=player["data"],
+        b50_list=b50_lst,
+        ajc_list=ajc_lst,
+        ajc_count=ajc_count,
+        force_result=result_force,
+    )
+    
+    if not success:
+        logger.error("Failed to save user data to database")
+        raise HTTPException(500, "数据保存失败")
 
-    return RedirectResponse(url=f"/table?token={token}")
+    return RedirectResponse(url=f"/table?uuid={user_uuid}")
 
 @app.get("/table")
-async def table_gen(request: Request, token: str = Query(...)):
+async def table_gen(request: Request, uuid: str = Query(...)):
     def build_chuniforce_html(force:float):
         def get_class_info(force: float) -> list[int]:
             if force < 2.5:
                 return [1, 1]
             
-            # 从 2.5 开始算偏移
             adjusted = force - 2.5
-            steps = adjusted / 0.5                  # 大部分是 0.5 步长
+            steps = adjusted / 0.5
             
-            # 特殊处理 14.0~15.0 区间有 0.25 细分（4→5）
             if force >= 14.0:
                 extra_steps = max(0, (force - 14.0) / 0.25)
-                steps = 13 + extra_steps            # 14.0 对应 steps ≈ 23
+                steps = 13 + extra_steps
             
-            index = int(steps)                      # 向下取整
+            index = int(steps)
             
             grade = index // 4 + 1
             sub   = index % 4 + 1
             
-            # 兜底
             if grade > 10 or (grade == 10 and sub > 4):
                 return [10, 4]
             
@@ -224,61 +249,63 @@ async def table_gen(request: Request, token: str = Query(...)):
         return html
     
     try:
-        # 获取存储在session中的信息并将其清除以释放内存
-        packed_data = await temp_data_store.get(f"table_data_{token}")
+        # 从数据库获取数据
+        user_data = await DatabaseManager.get_user_data(uuid)
+        
+        if not user_data:
+            raise HTTPException(404, "数据不存在或已过期，请重新授权")
+        
+        # 解包数据
+        player_data = user_data["player_data"]
+        b50_lst = user_data["b50_list"]
+        ajc_lst = user_data["ajc_list"]
+        ajc_cnt = user_data["ajc_count"]
+        force_result = user_data.get("force_result", 0)
+        
+        logger.info(f"Retrieved data for UUID: {uuid[:8]}..., ajc_count: {ajc_cnt}")
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(e)
-    
-    # 解包信息    
-    player:dict  = packed_data[0]
-    b50_lst:list = packed_data[1]
-    ajc_lst:list = packed_data[2]
-    ajc_cnt:int  = packed_data[3]
+        logger.error(f"Error retrieving data: {e}")
+        raise HTTPException(500, "数据获取失败")
 
-    total_force, total_ajc_force = 0, 0
-    for i in b50_lst:
-        total_force += i["force"]
-    avg_force = total_force / 50
+    # 计算统计数据
+    total_force = sum(item.get("force", 0) for item in b50_lst)
+    avg_force = total_force / 50 if b50_lst else 0
 
-    for i in ajc_lst:
-        total_ajc_force += i["ajc_force"]
-    avg_ajc_force = total_ajc_force / 50
+    total_ajc_force = sum(item.get("ajc_force", 0) for item in ajc_lst)
+    avg_ajc_force = total_ajc_force / 50 if ajc_lst else 0
 
     ajc_bonus = ajc_cnt / 10000
-    force_result = avg_force + avg_ajc_force + ajc_bonus
 
-    if len(b50_lst) < 50:
-        for _ in range(50 - len(b50_lst)):
-            b50_lst.append(EMPTY_SCORE)
+    # 确保列表长度为50
+    while len(b50_lst) < 50:
+        b50_lst.append(EMPTY_SCORE.copy())
+    while len(ajc_lst) < 50:
+        ajc_lst.append(EMPTY_SCORE.copy())
 
-    if len(ajc_lst) < 50:
-        for _ in range(50 - len(ajc_lst)):
-            ajc_lst.append(EMPTY_SCORE)
-            
     context = {
         "request"       : request,
         "time"          : datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "player"        : player,
+        "player"        : player_data,
         "b50_lst"       : b50_lst,
         "ajc_lst"       : ajc_lst,
         "emblem"        : build_chuniforce_html(force_result),
         "force_result"  : force_result,
         "avg_force"     : round(avg_force, 4),
         "avg_ajc_force" : avg_ajc_force,
-        "ajc_bonus"     : ajc_bonus
+        "ajc_bonus"     : ajc_bonus,
+        "version"       : __version__,
     }
             
-    return templates.TemplateResponse(name="table_render.html",
-                                      context=context,
-                                      status_code=200)
-
-
-class Default(WorkerEntrypoint):
-    async def fetch(self, req):
-        import asgi
-        return await asgi.fetch(app, req.js_object, self.env)
+    return templates.TemplateResponse(
+        name="table_render.html",
+        context=context,
+        status_code=200
+    )
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=5000, reload=True)
+    uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=True)

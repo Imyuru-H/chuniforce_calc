@@ -10,6 +10,8 @@ dependencies = [
     "workers-py",
     "requests",
     "itsdangerous>=2.2.0",
+    "sqlalchemy>=2.0.51",
+    "aiosqlite>=0.22.1",
 ]
 
 [dependency-groups]

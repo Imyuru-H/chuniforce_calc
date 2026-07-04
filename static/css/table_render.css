@@ -55,7 +55,7 @@ body {
 	font-family: var(--font-en);
 }
 
-#gen-time {
+.small-text {
 	color: #2F2D39;
 	font-size: 9px;
 	float: right;
@@ -378,4 +378,17 @@ body {
 
 .center {
 	text-align: center !important;
+}
+
+#bottom {
+	height: 30px;
+}
+
+#version {
+    text-align: center;
+    font-family: var(--font-en);
+    font-size: 0.5em;
+    color: #555a74;
+    display: block;
+    margin-top: 20px;
 }
